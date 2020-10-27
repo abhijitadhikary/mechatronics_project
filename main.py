@@ -18,6 +18,7 @@ import torchvision
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from model import *
+from metrics import *
 
 import torch
 torch.manual_seed(0)
@@ -32,7 +33,7 @@ learning_rate = 0.0001
 num_epochs = 500
 image_size = 224
 num_channels_input = 3
-batch_size = 4
+batch_size = 3
 num_keypoints_pose = 16
 
 variant = 'fcn'
@@ -69,18 +70,7 @@ epoch_start = 0
 epoch_end = num_epochs
 loss_train_best = np.Inf
 
-if load_checkpoint:
-    checkpoint_filename = f'{checkpoint_name}.pth'
-    checkpoint_fullpath = os.path.join(checkpoint_path, checkpoint_filename)
-    assert os.path.exists(checkpoint_fullpath), ('checkpoint do not exits for %s' % checkpoint_path)
-
-    checkpoint_saved = torch.load(checkpoint_fullpath, map_location='cpu')
-
-    model.load_state_dict(checkpoint_saved['model_state_dict'])
-    optimizer.load_state_dict(checkpoint_saved['optimizer_state_dict'])
-    epoch_start = checkpoint_saved['epoch_index'] + 1
-    loss_train_best = checkpoint_saved['best_loss']
-    print(f'Checkpoint loaded: {checkpoint_filename}')
+model, optimizer, epoch_start, loss_train_best = load_pretrained_model(load_checkpoint, checkpoint_name, checkpoint_path, model, optimizer, epoch_start, loss_train_best)
 
 
 for epoch_index in range(epoch_start, epoch_end, 1):
@@ -127,7 +117,7 @@ for epoch_index in range(epoch_start, epoch_end, 1):
 
         print(f'Epoch: [{epoch_index}/{num_epochs}]\tBatch: [{batch_index}/{num_batch_train}]\tLoss: {loss_train_batch:.3f}')
 
-        if batch_index % 100 == 0:
+        if batch_index == 0:
 
             with torch.no_grad():
                 model.eval()
@@ -156,6 +146,8 @@ for epoch_index in range(epoch_start, epoch_end, 1):
                 display_overlaid_image_dual(current_image, joints_X_real, joints_Y_real, joints_X_pred, joints_Y_pred, current_center, current_height, current_width, image_tag, current_visibility_array, current_heatmap_stack_real, current_heatmap_stack_fine)
                 visualize_keypoint_heatmaps(current_heatmap_stack_r, current_heatmap_stack_c, current_heatmap_stack_f, current_image, image_tag=f'heatmap_{image_tag}')
 
+                # calculate PCKH
+                calculate_pckh(joints_X_real, joints_Y_real, joints_X_pred, joints_Y_pred, current_visibility_array)
 
     if loss_train_epoch < loss_train_best:
         if not os.path.exists(checkpoint_path):

@@ -294,3 +294,19 @@ def get_max_value_heatmap(heatmap_stack):
             filter_index += 1
 
     return keypoints_batch
+
+def load_pretrained_model(load_checkpoint, checkpoint_name, checkpoint_path, model, optimizer, epoch_start, loss_train_best):
+    if load_checkpoint:
+        checkpoint_filename = f'{checkpoint_name}.pth'
+        checkpoint_fullpath = os.path.join(checkpoint_path, checkpoint_filename)
+        assert os.path.exists(checkpoint_fullpath), ('checkpoint do not exits for %s' % checkpoint_path)
+
+        checkpoint_saved = torch.load(checkpoint_fullpath, map_location='cpu')
+
+        model.load_state_dict(checkpoint_saved['model_state_dict'])
+        optimizer.load_state_dict(checkpoint_saved['optimizer_state_dict'])
+        epoch_start = checkpoint_saved['epoch_index'] + 1
+        loss_train_best = checkpoint_saved['best_loss']
+        print(f'Checkpoint loaded: {checkpoint_filename}')
+
+    return model, optimizer, epoch_start, loss_train_best
