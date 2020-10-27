@@ -53,7 +53,7 @@ dataset = MPII_dataset(custom_transforms=custom_transforms)
 dataloader_train = DataLoader(dataset, shuffle=True, batch_size=batch_size)
 
 # model = KeypointNet(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
-model = DeepLabV3(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
+model = FCN_Resnet101(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
 
 criterion_heatmap = nn.BCELoss()
 criterion_keypoints = nn.MSELoss()

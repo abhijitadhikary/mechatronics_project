@@ -114,9 +114,9 @@ class KeypointNet(nn.Module):
 
         return heatmaps_coarse, heatmaps_fine
 
-class DeepLabV3(nn.Module):
+class FCN_Resnet101(nn.Module):
     def __init__(self, image_size=224, num_channels=3, num_keypoints=16, device=torch.device('cuda')):
-        super(DeepLabV3, self).__init__()
+        super(FCN_Resnet101, self).__init__()
         self.coarse_module = torchvision.models.segmentation.fcn_resnet101(pretrained=True, progress=True, num_classes=21, aux_loss=None).to(device)
         self.coarse_module.classifier[4] = nn.Conv2d(in_channels=512, out_channels=16, kernel_size=1, stride=1).to(device)
         self.coarse_module.aux_classifier[4] = nn.Conv2d(in_channels=256, out_channels=16, kernel_size=1, stride=1).to(device)

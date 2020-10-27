@@ -15,6 +15,7 @@ import torchvision.transforms as transforms
 from scipy.ndimage import gaussian_filter
 import seaborn as sns
 from mpl_toolkits.axes_grid1 import ImageGrid
+from emotion_recognition_model_custom_def import *
 
 def display_overlaid_image(image, joints_X, joints_Y, center):
     fig, ax = plt.subplots(1)
@@ -310,3 +311,33 @@ def load_pretrained_model(load_checkpoint, checkpoint_name, checkpoint_path, mod
         print(f'Checkpoint loaded: {checkpoint_filename}')
 
     return model, optimizer, epoch_start, loss_train_best
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# face emotion
+
+def load_model_and_checkpoints():
+    model = FacEmoteModel()
+    model.to('cuda:0')
+
+    checkpoint_saved = torch.load('checkpoints/ER_Model_Custom_checkpoint_5.pth')
+    #model.model incase of pretrained
+    model.load_state_dict(checkpoint_saved['model_state_dict'])
+    return model
