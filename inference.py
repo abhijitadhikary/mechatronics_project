@@ -3,6 +3,7 @@ import numpy as np
 from model import *
 from utils import *
 import torch.optim as optim
+from time import time
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -43,8 +44,11 @@ while True:
     resized_image = cv2.resize(input_image, (height, width), interpolation=cv2.INTER_AREA)
     resized_image_tensor = transforms.ToTensor()(resized_image).unsqueeze(0).to(device)
 
+    start_time = time()
     with torch.no_grad():
         _, heatmap_fine = model(resized_image_tensor)
+    fps = 1.0 / (time() - start_time)
+    # print(f'FPS: {fps}')
     keypoints_fine = (get_max_value_heatmap(heatmap_fine).to(device))
     joints_X, joints_Y = separate_X_Y(keypoints_fine[0])
 
@@ -92,15 +96,19 @@ while True:
     # Stop if escape key is pressed
     joints_X *= (height_input / image_size)
     joints_Y *= (height_input / image_size)
-    for i in range((len(joints_X) - 1)):
-        if i == 9 or i == 5:
-            continue
-        cv2.putText(input_image, "{}".format(i), (joints_X[i], joints_Y[i]), cv2.FONT_HERSHEY_PLAIN, fontScale=0.7, color=(255, 255, 255))
-        start_point = (joints_X[i], joints_Y[i])
-        end_point = (joints_X[i + 1], joints_Y[i + 1])
-        cv2.line(input_image, start_point, end_point, color=(0, 0, 255), thickness=5)
+    num_joints = (len(joints_X))
+    for joint_index in range(num_joints):
+        if joint_index < num_joints-1:
+            if joint_index == 9 or joint_index == 5:
+                continue
+            cv2.putText(input_image, "{}".format(joint_index), (joints_X[joint_index], joints_Y[joint_index]), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, fontScale=2, color=(0, 255, 0))
+            start_point = (joints_X[joint_index], joints_Y[joint_index])
+            end_point = (joints_X[joint_index + 1], joints_Y[joint_index + 1])
+            cv2.line(input_image, start_point, end_point, color=(0, 0, 255), thickness=10)
+        input_image = cv2.circle(input_image, (joints_X[joint_index], joints_Y[joint_index]), 20, (255, 255, 0), -1)
 
     # resized_image = cv2.resize(resized_image, (1080, 1080), interpolation=cv2.INTER_AREA)
+    cv2.putText(input_image, f'{int(fps)} FPS', (10, 100), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, fontScale=2, color=(0, 0, 255))
     cv2.imshow('img', input_image)
     k = cv2.waitKey(30) & 0xff
     if k == 27:
