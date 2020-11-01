@@ -237,22 +237,25 @@ def convert2canonical(joints):
 
 
 def calculate_pckh(real_X, real_Y, pred_X, pred_Y, visibility_array):
-    batch_size = 1
-    real_X = np.array(np.where(visibility_array > 0, real_X, 0)) * 224
-    real_Y = np.array(np.where(visibility_array > 0, real_Y, 0)) * 224
+    batch_size = real_X.shape[0]
 
-    pred_X = np.array(np.where(visibility_array > 0, pred_X, 0)) * 224
-    pred_Y = np.array(np.where(visibility_array > 0, pred_Y, 0)) * 224
+    for index in range(batch_size):
+        real_X[index] = np.array(np.where(visibility_array[index] > 0, real_X[index], 0)) * 224
+        real_Y[index] = np.array(np.where(visibility_array[index] > 0, real_Y[index], 0)) * 224
+
+        pred_X[index] = np.array(np.where(visibility_array[index] > 0, pred_X[index], 0)) * 224
+        pred_Y[index] = np.array(np.where(visibility_array[index] > 0, pred_Y[index], 0)) * 224
 
     # real.shape = bs x 16 x 2
     real = np.zeros((batch_size, 16, 2))
     pred = np.zeros((batch_size, 16, 2))
 
-    real[0, :, 1] = real_X
-    real[0, :, 0] = real_Y
+    for index in range(batch_size):
+        real[index, :, 1] = real_X[index]
+        real[index, :, 0] = real_Y[index]
 
-    pred[0, :, 1] = pred_X
-    pred[0, :, 0] = pred_Y
+        pred[index, :, 1] = pred_X[index]
+        pred[index, :, 0] = pred_Y[index]
 
 
     # num_batches = real.shape[0]
@@ -261,5 +264,9 @@ def calculate_pckh(real_X, real_Y, pred_X, pred_Y, visibility_array):
 
     result = eval_pckh(real_sticks, pred_sticks)
     average_pckh = average_pckh_symmetric_joints(result)
-    print(result)
-    print(average_pckh)
+    # print(result)
+    # print(average_pckh)
+    average_pckh = average_pckh[0]
+    class_names = average_pckh[1]
+
+    return average_pckh, class_names

@@ -341,3 +341,49 @@ def load_model_and_checkpoints():
     #model.model incase of pretrained
     model.load_state_dict(checkpoint_saved['model_state_dict'])
     return model
+
+
+
+
+
+
+
+
+
+
+# face keypoint
+def resume(checkpoint_path, model):
+    assert os.path.exists(checkpoint_path), ('checkpoint path doesn\'t exist %s' % checkpoint_path)
+
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    model.load_state_dict(checkpoint['model_state_dict'])
+
+    print('Resume completed for the model\n')
+
+    return model
+
+def detect_keypoints(image, model, device):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.resize(image, (96, 96), interpolation=cv2.INTER_AREA)
+    image_batch = transforms.ToTensor()(image).unsqueeze(0).to(device)
+    output = model(image_batch)
+
+    # image = image_batch[0].squeeze(0).cpu().detach().numpy()  # convert image to numpy array
+    annotations_preds = output[0].squeeze(0).cpu().detach().numpy()
+
+    annotations_preds = np.array(normalize_annotations_to_2d(annotations_preds))
+
+    return annotations_preds
+
+
+def normalize_annotations_to_2d(annotations):
+    annotations = np.array(annotations)
+    height = 96
+    # annotations = np.where(annotations>=0, annotations*height, annotations)
+    annotations = annotations * height
+    # annotations = annotations
+
+    annotations_x = annotations[::2]
+    annotations_y = annotations[1::2]
+
+    return annotations_x, annotations_y

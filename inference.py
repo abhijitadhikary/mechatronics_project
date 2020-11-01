@@ -25,26 +25,38 @@ num_channels_input = 3
 batch_size = 4
 num_keypoints_pose = 16
 
-variant = 'fcn'
+variant = 'my'
 checkpoint_path = 'checkpoints'
 checkpoint_name = f'checkpoint_{variant}'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 image_size = 224
 load_checkpoint = True
 learning_rate = 0.0001
+checkpoint_name_keypoint = 'keypoints_checkpoint.pth'
+checkpoint_path_keypoint = os.path.join(checkpoint_path, checkpoint_name_keypoint)
 
-pose_model = FCN_Resnet101(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
+# pose
+if variant == 'my':
+    pose_model = KeypointNet(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
+if variant == 'fcn':
+    pose_model = FCN_Resnet101(image_size=image_size, num_channels=num_channels_input, num_keypoints=num_keypoints_pose).to(device)
 optimizer = optim.Adam(pose_model.parameters(), lr=learning_rate, betas=(0.9, 0.999))
 pose_model, optimizer, epoch_start, loss_train_best = load_pretrained_model(load_checkpoint, checkpoint_name, checkpoint_path, pose_model, optimizer, epoch_start=0, loss_train_best=0)
 pose_model.eval()
 
+# emotion
 face_model = load_model_and_checkpoints()
-# face_model.eval()
+
+# facial keypoint
+facial_keypoint_model = FacialKeypointNet().to(device)
+facial_keypoint_model = resume(checkpoint_path_keypoint, facial_keypoint_model).to(device)
+facial_keypoint_model.eval()
+
 
 # To capture video from webcam.
 cap = cv2.VideoCapture(0)
-cap.set(3, 1920)
-cap.set(4, 1080)
+cap.set(3, 1600)
+cap.set(4, 900)
 cap.set(5, 60)
 # To use a video file as input
 # cap = cv2.VideoCapture('filename.mp4')
@@ -115,49 +127,84 @@ while True:
     joints_Y *= (height_input / image_size)
 
     # extract face
-    height_face = np.abs(int((joints_Y[9] - joints_Y[8])*1.1))
+    height_face = np.abs(int((joints_Y[9] - joints_Y[8])*1.3))
     face_midpoint_X = int((joints_X[8] + joints_X[9]) / 2)
+    face_midpoint_X = int(face_midpoint_X - face_midpoint_X*0.01)
     face_midpoint_Y = int((joints_Y[8] + joints_Y[9]) / 2)
+    face_midpoint_Y = int(face_midpoint_Y + face_midpoint_Y*0.0)
 
+    # face bounding box
     top_left_X = face_midpoint_X-(height_face//2)
     top_left_Y = face_midpoint_Y-(height_face//2)
-
     cv2.rectangle(input_image, (top_left_X, top_left_Y), (top_left_X + height_face, top_left_Y + height_face), (0, 255, 0), 5)
 
-    # input_image = cv2.circle(input_image, (face_midpoint_X, face_midpoint_Y), 5, (255, 128, 128), -1)
+    # extract face image
     face_image = np.copy(input_image[top_left_Y:top_left_Y+height_face, top_left_X:top_left_X+height_face, :])
     face_h, face_w, face_c = face_image.shape
     if face_h <= 0 or face_w <= 0:
-        face_image = np.zeros((96, 96, 3)).astype(np.float32)
+        face_image = np.zeros((96, 96, 3)).astype(np.uint8)
+        # start_Y = joints_Y[8]-200
+        # end_Y = joints_Y[8]+200
+        # start_X = joints_X[8]-500
+        # end_X = joints_X[8]
+        # if start_Y < 0:
+        #     start_Y = 0
+        # if end_Y > height_input:
+        #     end_Y = 0
+        # if start_X > 0:
+        #     start_X = 0
+        # if end_X > height_input:
+        #     end_X = 0
+        #
+        # face_image = np.copy(input_image[start_Y:end_Y, start_X:end_Y, :])
+        # face_image[0, 0, 0] = 1
 
-    face_image_tensor = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
-    face_image_tensor = cv2.resize(face_image_tensor, (48, 48), interpolation=cv2.INTER_AREA)
-    face_image_tensor = transforms.ToTensor()(face_image_tensor).permute(2, 0, 1).unsqueeze(0)
-    with torch.no_grad():
-        prediction = face_model.predict_from_image(face_image_tensor)
-    cv2.putText(face_image, prediction, (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (0, 255, 0), 1)
+    # face_image_tensor = cv2.cvtColor(face_image, cv2.COLOR_BGR2GRAY)
+    # face_image_tensor = cv2.resize(face_image_tensor, (48, 48), interpolation=cv2.INTER_AREA)
+    # face_image_tensor = transforms.ToTensor()(face_image_tensor).permute(2, 0, 1).unsqueeze(0)
+    # with torch.no_grad():
+    #     emotion_pred = face_model.predict_from_image(face_image_tensor)
+    #     facial_keypoints_pred = detect_keypoints(face_image, facial_keypoint_model, device)
+    #     facial_keypoints_pred *= (face_h/96)
+    #
+    # for keypoint_index in range(len(facial_keypoints_pred[0])):
+    #     cv2.circle(face_image, (int(facial_keypoints_pred[0][keypoint_index]), int(facial_keypoints_pred[1][keypoint_index])), 1, (0, 0, 255), -10)
+    # cv2.putText(face_image, emotion_pred, (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.70, (0, 255, 0), 1)
+
+
 
     # draw joints
+    only_face = True
     num_joints = (len(joints_X))
     for joint_index in range(num_joints):
-        input_image = cv2.circle(input_image, (joints_X[joint_index], joints_Y[joint_index]), 20, (255, 255, 0), -1)
+        if only_face:
+            if (joint_index >= 6):
+                input_image = cv2.circle(input_image, (joints_X[joint_index], joints_Y[joint_index]), 20, (255, 255, 0), -1)
+        else:
+            input_image = cv2.circle(input_image, (joints_X[joint_index], joints_Y[joint_index]), 20, (255, 255, 0), -1)
+
         cv2.putText(input_image, "{}".format(joint_index), (joints_X[joint_index], joints_Y[joint_index]), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, fontScale=2, color=(0, 255, 0))
         if joint_index < num_joints-1:
             if joint_index == 9 or joint_index == 5:
                 continue
             start_point = (joints_X[joint_index], joints_Y[joint_index])
             end_point = (joints_X[joint_index + 1], joints_Y[joint_index + 1])
-            cv2.line(input_image, start_point, end_point, color=(0, 0, 255), thickness=10)
+            if only_face:
+                if (joint_index >= 6):
+                    cv2.line(input_image, start_point, end_point, color=(0, 0, 255), thickness=10)
+            else:
+                cv2.line(input_image, start_point, end_point, color=(0, 0, 255), thickness=10)
 
     # resized_image = cv2.resize(resized_image, (1080, 1080), interpolation=cv2.INTER_AREA)
-    cv2.putText(input_image, f'{int(fps)} FPS', (10, 100), cv2.FONT_HERSHEY_SCRIPT_SIMPLEX, fontScale=2, color=(0, 0, 255))
+    cv2.putText(input_image, f'{int(fps)} FPS', (10, 100), cv2.FONT_HERSHEY_PLAIN, fontScale=2, color=(0, 0, 255))
 
     # cv2.imshow('img', input_image)
     face_image = cv2.resize(face_image, (height_input, height_input), interpolation=cv2.INTER_AREA)
     combined_image = np.concatenate((input_image, face_image), axis=1)
+    print(f'min: {np.min(combined_image)}\tmax: {np.max(combined_image)}')
     cv2.imshow('img', combined_image)
 
-    print()
+    # print()
 
 
 

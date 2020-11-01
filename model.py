@@ -136,3 +136,51 @@ class FCN_Resnet101(nn.Module):
         # coordinates = self.block_out(out_block_1)
 
         return heatmaps_coarse, heatmaps_fine
+
+
+class FacialKeypointNet(nn.Module):
+
+    def __init__(self):
+        super(FacialKeypointNet, self).__init__()
+
+        # 1 x 96 x 96     -->     16 x 48 x 48
+        self.conv_1 = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=3, padding=1, stride=1)
+        self.bn_1 = nn.BatchNorm2d(16)
+
+        # 16 x 48 x 48     -->     32 x 24 x 24
+        self.conv_2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1, stride=1)
+        self.bn_2 = nn.BatchNorm2d(32)
+
+        # 32 x 24 x 24     -->     64 x 12 x 12
+        self.conv_3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1, stride=1)
+        self.bn_3 = nn.BatchNorm2d(64)
+
+        # 64 x 12 x 12     -->     16 x 12 x 12
+        self.conv_4 = nn.Conv2d(in_channels=64, out_channels=16, kernel_size=1, padding=0, stride=1)
+        self.bn_4 = nn.BatchNorm2d(16)
+
+        self.fc_1 = nn.Linear(in_features=16 * 6 * 6, out_features=256)
+        self.bn_fc_1 = nn.BatchNorm1d(256)
+
+        self.fc_2 = nn.Linear(in_features=256, out_features=128)
+        self.bn_fc_2 = nn.BatchNorm1d(128)
+
+        self.fc_3 = nn.Linear(in_features=128, out_features=30)
+
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout2d(0.5)
+        self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+    def forward(self, input):
+        out = self.maxpool(self.dropout(self.bn_1(self.relu(self.conv_1(input)))))
+        out = self.maxpool(self.dropout(self.bn_2(self.relu(self.conv_2(out)))))
+        out = self.maxpool(self.dropout(self.bn_3(self.relu(self.conv_3(out)))))
+        out = self.maxpool(self.dropout(self.bn_4(self.relu(self.conv_4(out)))))
+
+        out = out.reshape(-1, 16 * 6 * 6)
+
+        out = self.bn_fc_1(self.relu(self.fc_1(out)))
+        out = self.bn_fc_2(self.relu(self.fc_2(out)))
+        out = self.fc_3(out)
+
+        return out
